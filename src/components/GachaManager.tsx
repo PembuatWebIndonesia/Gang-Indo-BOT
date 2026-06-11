@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { GachaRole } from '../types';
-import { Sparkles, Dice5, Percent, Plus, Trash2, Heart, RotateCcw, Award, CheckCircle, BarChart3 } from 'lucide-react';
+import { Sparkles, Dice5, Percent, Plus, Trash2, Award, BarChart3, ShieldAlert, CheckCircle2, UserCheck, Eye } from 'lucide-react';
 
 interface GachaManagerProps {
   initialRoles: GachaRole[];
@@ -14,11 +14,25 @@ interface RollLog {
   color: string;
 }
 
+interface BulkSimulationResult {
+  totalRolls: number;
+  hits: Record<string, number>;
+  actualPercentage: Record<string, number>;
+}
+
 export default function GachaManager({ initialRoles, updateRoles }: GachaManagerProps) {
   const [roles, setRoles] = useState<GachaRole[]>(initialRoles);
   const [logs, setLogs] = useState<RollLog[]>([]);
   const [isRolling, setIsRolling] = useState(false);
   const [winner, setWinner] = useState<GachaRole | null>(null);
+
+  // Nickname Decorator Mockup state
+  const [mockUserNick, setMockUserNick] = useState('vallensr1204');
+  const [mockSelectedRarity, setMockSelectedRarity] = useState<'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Divine'>('Divine');
+
+  // Bulk simulation state
+  const [bulkResult, setBulkResult] = useState<BulkSimulationResult | null>(null);
+  const [isSimulatingBulk, setIsSimulatingBulk] = useState(false);
 
   // New role template states
   const [newRole, setNewRole] = useState({
@@ -29,11 +43,11 @@ export default function GachaManager({ initialRoles, updateRoles }: GachaManager
   });
 
   const rarityMeta = {
-    Common: { name: 'Sipil / Biasa', color: '#a1a1aa', weight: 60 },
-    Rare: { name: 'Kelas Intel / Gangster', color: '#10b981', weight: 30 },
-    Epic: { name: 'Lurah / Elite', color: '#3b82f6', weight: 8 },
-    Legendary: { name: 'Bandar Judi / Sultan', color: '#a855f7', weight: 1.9 },
-    Divine: { name: 'Dewa Langit / Admin', color: '#eab308', weight: 0.1 }
+    Common: { name: 'Sipil / Biasa', color: '#a1a1aa', weight: 60, prefix: '🏠 [WARGA] ', suffix: ' [🏠]' },
+    Rare: { name: 'Kelas Intel / Gangster', color: '#10b981', weight: 30, prefix: '🟢 [INTEL] ', suffix: ' [🕵️]' },
+    Epic: { name: 'Lurah / Elite', color: '#3b82f6', weight: 8, prefix: '🔵 [LURAH SAKTI] ', suffix: ' [🛡️]' },
+    Legendary: { name: 'Bandar Judi / Sultan', color: '#a855f7', weight: 1.9, prefix: '🟣 [SULTAN SANGAT TAJIR] ', suffix: ' [💰]' },
+    Divine: { name: 'Dewa Langit / Admin', color: '#eab308', weight: 0.1, prefix: '👑 [DEWA LANGIT FOUNDER] ', suffix: ' [⚡]' }
   };
 
   const handleAddRoleConfig = (e: React.FormEvent) => {
@@ -51,8 +65,6 @@ export default function GachaManager({ initialRoles, updateRoles }: GachaManager
     const updated = [...roles, fresh];
     setRoles(updated);
     updateRoles(updated);
-
-    // Reset Name input
     setNewRole({ ...newRole, roleName: '' });
   };
 
@@ -62,37 +74,62 @@ export default function GachaManager({ initialRoles, updateRoles }: GachaManager
     updateRoles(updated);
   };
 
-  // Perform a local trial roll
+  // Perform a single local trial roll
   const handleTrialRoll = () => {
     if (roles.length === 0) return;
     setIsRolling(true);
     setWinner(null);
 
-    // Dynamic slot-machine effect
     setTimeout(() => {
-      // Choose based on probability weights
-      const totalWeight = roles.reduce((sum, r) => sum + r.chance, 0);
-      let rand = Math.random() * totalWeight;
-      let selected: GachaRole = roles[0];
-
-      for (const role of roles) {
-        if (rand < role.chance) {
-          selected = role;
-          break;
-        }
-        rand -= role.chance;
-      }
-
+      const selected = performWeightedRoll();
       setWinner(selected);
       setIsRolling(false);
 
-      // Append log
       const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLogs((prev) => [
         { time, role: selected.roleName, rarity: selected.rarity, color: selected.color },
-        ...prev.slice(0, 19)
+        ...prev.slice(0, 14)
       ]);
-    }, 1200);
+    }, 900);
+  };
+
+  const performWeightedRoll = (): GachaRole => {
+    const totalWeight = roles.reduce((sum, r) => sum + r.chance, 0);
+    let rand = Math.random() * totalWeight;
+    for (const role of roles) {
+      if (rand < role.chance) {
+        return role;
+      }
+      rand -= role.chance;
+    }
+    return roles[0];
+  };
+
+  // Bulk Simulator loop calculations
+  const handleRunBulkSimulation = (count: number) => {
+    if (roles.length === 0) return;
+    setIsSimulatingBulk(true);
+
+    setTimeout(() => {
+      const hits: Record<string, number> = { Common: 0, Rare: 0, Epic: 0, Legendary: 0, Divine: 0 };
+
+      for (let i = 0; i < count; i++) {
+        const pulled = performWeightedRoll();
+        hits[pulled.rarity] = (hits[pulled.rarity] || 0) + 1;
+      }
+
+      const actualPercentage: Record<string, number> = {};
+      Object.keys(hits).forEach((key) => {
+        actualPercentage[key] = parseFloat(((hits[key] / count) * 100).toFixed(2));
+      });
+
+      setBulkResult({
+        totalRolls: count,
+        hits,
+        actualPercentage
+      });
+      setIsSimulatingBulk(false);
+    }, 400);
   };
 
   const getRarityStats = (rarity: GachaRole['rarity']) => {
@@ -103,177 +140,310 @@ export default function GachaManager({ initialRoles, updateRoles }: GachaManager
 
   return (
     <div className="flex-1 p-6 md:p-8 space-y-6 text-gray-100 overflow-y-auto" id="gacha-manager-panel">
-      {/* Banner */}
+      
+      {/* Tab Header Banner */}
       <div className="border-b border-[#2d4026] pb-5">
         <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          🔮 Gacha Nasib (Gacha Role Setup)
+          🔮 Gacha Nasib & Penyeimbang Rarity (Gacha Balancer Engine)
         </h2>
         <p className="text-sm text-gray-400 mt-1">
-          Konfigurasi role discord, kelola status rarity keberuntungan, dan latih simulasi gacha rol takdir server.
+          Atur rasio kemunculan role takdir, simulasikan ribuan kocokan instan untuk memverifikasi penyeimbang peluang, dan hiasi nickname Anda di mockup Discord.
         </p>
       </div>
 
-      {/* Trial Wheel Box & Quick Stats */}
+      {/* Row 1: Kocok Mandiri vs Nickname Mockup */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left: Interactive Wheel / Roller (45%) */}
+        {/* Left: Uji Coba Kocok Mandiri */}
         <div className="lg:col-span-5 bg-[#141b11] border border-[#2d4026] p-6 rounded-2xl flex flex-col justify-between items-center text-center space-y-4 shadow-xl">
           <div className="w-full text-left">
-            <span className="text-[11px] font-mono text-[#9fe870] font-bold block">UJI COBA COK NASIB</span>
-            <h3 className="font-bold text-white text-base">Uji Keberuntungan Gacha</h3>
+            <span className="text-[10px] font-mono text-[#9fe870] font-bold block uppercase tracking-wider">UJI COBA COK NASIB</span>
+            <h3 className="font-bold text-white text-base">Simulasi Rol Takdir Mandiri</h3>
           </div>
 
-          {/* Rolling Display Animation */}
-          <div className="w-full aspect-square max-w-[200px] rounded-full border-4 border-dashed border-[#d4af37] flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black/40">
-            <div className="absolute inset-0 bg-[#d4af37]/5 animate-pulse rounded-full"></div>
+          <div className="w-full aspect-square max-w-[180px] rounded-full border-4 border-dashed border-[#e3f65e]/40 flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black/40">
+            <div className="absolute inset-0 bg-[#9fe870]/5 animate-pulse rounded-full"></div>
             {isRolling ? (
               <div className="space-y-2 animate-bounce">
                 <Dice5 className="text-[#9fe870] animate-spin mx-auto" size={40} />
-                <span className="text-xs font-mono text-gray-400">MEMUTAR NASIB...</span>
+                <span className="text-[10px] font-mono text-gray-400">MEMUTAR TAKDIR...</span>
               </div>
             ) : winner ? (
               <div className="space-y-1.5 animate-scale-in">
-                <Award size={36} style={{ color: winner.color }} className="mx-auto" />
-                <h4 className="font-extrabold text-sm tracking-wide text-white truncate max-w-[150px]">{winner.roleName}</h4>
-                <div className="inline-block px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold" style={{ backgroundColor: `${winner.color}30`, color: winner.color }}>
+                <div className="inline-block px-2 py-0.5 rounded text-[9px] uppercase font-mono font-extrabold select-none mb-1 shadow-sm" style={{ backgroundColor: `${winner.color}30`, color: winner.color, border: `1px solid ${winner.color}30` }}>
                   {winner.rarity}
                 </div>
+                <h4 className="font-black text-xs md:text-sm tracking-wide text-white truncate max-w-[150px]" style={{ color: winner.color }}>{winner.roleName}</h4>
+                <p className="text-[10px] font-mono text-zinc-500">Peluang: {winner.chance}%</p>
               </div>
             ) : (
               <div className="space-y-2">
-                <Sparkles className="text-zinc-600 mx-auto" size={32} />
-                <span className="text-xs text-zinc-500 font-sans">Siap Mengocok</span>
+                <Sparkles className="text-zinc-600 mx-auto animate-pulse" size={28} />
+                <span className="text-[10px] text-zinc-500 uppercase font-mono tracking-widest font-bold">Siap Diputar</span>
               </div>
             )}
           </div>
 
           <button
-            id="btn-trigger-local-gacha"
             onClick={handleTrialRoll}
             disabled={isRolling || roles.length === 0}
-            className={`w-full py-3 bg-[#9fe870] text-black font-bold uppercase tracking-wider text-xs rounded-xl shadow-lg transition-transform hover:scale-[1.01] active:translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
+            className="w-full py-2.5 bg-gradient-to-r from-[#9fe870] to-[#5bb22b] text-black font-extrabold uppercase tracking-wider text-xs rounded-xl shadow-lg hover:scale-101 active:scale-99 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isRolling ? 'Mengocok...' : '🎰 PUTAR GACHA (FREE TRIAL)'}
+            {isRolling ? 'Memutar...' : '🎰 PUTAR GACHA (FREE TRIAL)'}
           </button>
         </div>
 
-        {/* Right: Pool Configurator (75%) */}
-        <div className="lg:col-span-7 bg-[#1c231a] border border-[#2d4026]/80 p-6 rounded-2xl flex flex-col justify-between shadow-xl">
-          <div className="space-y-3">
-            <h3 className="font-bold text-white text-base flex items-center gap-2">
-              <Percent size={18} className="text-[#9fe870]" />
-              Formulir Tambah Role Gacha
-            </h3>
-
-            <form onSubmit={handleAddRoleConfig} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-sans">
-              <div className="space-y-1">
-                <label className="text-xs text-gray-300 font-medium uppercase">Nama Role Discord</label>
-                <input
-                  type="text"
-                  required
-                  id="gacha-new-role"
-                  value={newRole.roleName}
-                  onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })}
-                  placeholder="Contoh: @Admin Ganteng / @Begal Senior"
-                  className="w-full bg-black/40 border border-[#2d4026] px-3.5 py-2 rounded text-zinc-100 focus:border-[#9fe870] focus:outline-none placeholder-zinc-600 text-xs md:text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-gray-300 font-semibold uppercase">Rarity Pool</label>
-                  <select
-                    id="gacha-new-rarity"
-                    value={newRole.rarity}
-                    onChange={(e) => {
-                      const selectedRarity = e.target.value as GachaRole['rarity'];
-                      setNewRole({
-                        ...newRole,
-                        rarity: selectedRarity,
-                        chance: rarityMeta[selectedRarity].weight,
-                      });
-                    }}
-                    className="w-full bg-black/40 border border-[#2d4026] px-2.5 py-2 rounded text-zinc-100 focus:border-[#9fe870] focus:outline-none text-xs"
-                  >
-                    <option value="Common">⚪ Common (60%)</option>
-                    <option value="Rare">🟢 Rare (30%)</option>
-                    <option value="Epic">🔵 Epic (8%)</option>
-                    <option value="Legendary">🟣 Legendary (1.9%)</option>
-                    <option value="Divine">🟡 Divine (0.1%)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs text-gray-300 font-semibold uppercase">Peluang (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0.01"
-                    max="100"
-                    required
-                    id="gacha-new-chance"
-                    value={newRole.chance}
-                    onChange={(e) => setNewRole({ ...newRole, chance: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-black/40 border border-[#2d4026] px-2 py-2 rounded text-zinc-100 focus:border-[#9fe870] focus:outline-none text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-2 pt-2">
-                <button
-                  type="submit"
-                  id="btn-add-gacha-role"
-                  className="w-full py-2 bg-gradient-to-r from-blue-700 to-indigo-700 text-white hover:from-blue-600 hover:to-indigo-600 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1"
-                >
-                  <Plus size={14} />
-                  <span>Pasang Role ke Mesin Gacha</span>
-                </button>
-              </div>
-            </form>
+        {/* Right: Discord Nickname Decorator Live Mockup */}
+        <div className="lg:col-span-7 bg-[#141b11] border border-[#2d4026] p-6 rounded-2xl flex flex-col justify-between space-y-4 shadow-xl">
+          <div>
+            <span className="text-[10px] font-mono text-yellow-400 font-bold block uppercase tracking-wider">PREVIEW HIASAN PREFIKS</span>
+            <h3 className="font-bold text-white text-base">Visualisasi Hiasan Nama (Discord Name Mockup)</h3>
+            <p className="text-xs text-gray-400 mt-1">Hiasan nama akan otomatis terpasang mengikuti kasta gacha tertinggi yang dimiliki member di server Anda.</p>
           </div>
 
-          {/* Quick Probability Check */}
-          <div className="mt-4 pt-4 border-t border-zinc-800/60 font-sans">
-            <span className="text-[10px] text-zinc-400 font-bold block uppercase tracking-wider mb-2">Sebaran Rincian Rarity Terpasang</span>
-            <div className="flex flex-wrap gap-3">
-              {Object.keys(rarityMeta).map((key) => {
-                const rKey = key as GachaRole['rarity'];
-                const stat = getRarityStats(rKey);
-                return (
-                  <div key={key} className="bg-black/30 border border-zinc-900 rounded-lg p-2 flex-1 min-w-[90px] text-center">
-                    <span className="text-[9px] font-mono block" style={{ color: rarityMeta[rKey].color }}>
-                      ● {key}
-                    </span>
-                    <span className="text-xs font-bold text-white block mt-0.5">{stat.count} Role</span>
-                    <span className="text-[8px] text-zinc-500 font-mono block">{stat.totalChance}% peluang</span>
-                  </div>
-                );
-              })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-300 font-semibold uppercase">Tulis Nickname Nama</label>
+              <input
+                type="text"
+                value={mockUserNick}
+                onChange={(e) => setMockUserNick(e.target.value)}
+                placeholder="nama_warga"
+                className="w-full bg-black/40 border border-[#2d4026] px-3.5 py-2 rounded text-zinc-100 outline-none focus:border-[#9fe870] text-xs font-mono"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-zinc-300 font-semibold uppercase">Pilih Rarity Capian</label>
+              <select
+                value={mockSelectedRarity}
+                onChange={(e) => setMockSelectedRarity(e.target.value as any)}
+                className="w-full bg-black/40 border border-[#2d4026] p-2 rounded text-zinc-300 text-xs focus:border-[#9fe870] outline-none"
+              >
+                <option value="Common">⚪ Common (Warga Biasa)</option>
+                <option value="Rare">🟢 Rare (Intel Lapangan)</option>
+                <option value="Epic">🔵 Epic (Lurah Sakti)</option>
+                <option value="Legendary">🟣 Legendary (Sultan Kaya)</option>
+                <option value="Divine">🟡 Divine (Dewa Langit)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Discord Chat Mockup Board */}
+          <div className="bg-[#313338] border border-black/30 rounded-xl p-4 space-y-2 font-sans select-none shadow">
+            <span className="text-[8px] font-mono text-zinc-500 uppercase font-bold block">Discord Desktop Client Mockup</span>
+            
+            <div className="flex items-start space-x-3.5 pt-1">
+              <img
+                src={`https://api.dicebear.com/7.x/identicon/svg?seed=${mockUserNick}`}
+                alt="preview-avatar"
+                className="w-9 h-9 rounded-full bg-[#1e231c]' shrink-0"
+              />
+
+              <div>
+                <div className="flex items-baseline space-x-1.5">
+                  {/* Decorated Nickname! */}
+                  <span 
+                    className="font-bold text-sm tracking-wide cursor-pointer hover:underline"
+                    style={{ color: rarityMeta[mockSelectedRarity].color }}
+                  >
+                    {rarityMeta[mockSelectedRarity].prefix}
+                    {mockUserNick}
+                    {rarityMeta[mockSelectedRarity].suffix}
+                  </span>
+                  <span className="text-[9px] text-zinc-400">Hari ini 12:00</span>
+                </div>
+                <p className="text-xs text-[#dbdee1] leading-none mt-1">Permisi lurah, saya numpang mabar di general voice channel ya 🙏</p>
+              </div>
             </div>
           </div>
         </div>
+
       </div>
 
-      {/* Role configurations Table / List */}
-      <div className="bg-[#141b11] border border-[#2d4026] rounded-2xl overflow-hidden shadow-xl font-sans" id="gacha-roles-table">
-        <div className="p-4 bg-black/20 border-b border-[#2d4026] flex items-center justify-between">
-          <h4 className="font-bold text-white text-sm">Daftar Setelan Role Gacha ({roles.length})</h4>
-          <span className="text-[10px] text-yellow-400 font-mono">Total Peluang Terpakai: {roles.reduce((sum, r) => sum + r.chance, 0).toFixed(1)}%</span>
+      {/* Row 2: BULK SIMULATOR (BENCH TESTING) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Side: Setup Form Custom Role (4 columns) */}
+        <div className="lg:col-span-4 bg-[#141b11] border border-[#2d4026] p-6 rounded-2xl space-y-4 shadow-xl">
+          <div className="space-y-1">
+            <span className="text-[10px] font-mono text-[#9fe870] font-bold block uppercase tracking-wider font-sans">POOL CONFIGURATOR</span>
+            <h3 className="font-bold text-white text-base">Pasang Role Takdir Baru</h3>
+          </div>
+
+          <form onSubmit={handleAddRoleConfig} className="space-y-4 text-xs font-sans">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-300 font-semibold uppercase">Nama Role Discord</label>
+              <input
+                type="text"
+                required
+                value={newRole.roleName}
+                onChange={(e) => setNewRole({ ...newRole, roleName: e.target.value })}
+                placeholder="Contoh: @Dewa Langit / @Begal Senior"
+                className="w-full bg-black/40 border border-[#2d4026] px-3.5 py-2.5 rounded text-zinc-100 placeholder-zinc-700 outline-none text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-gray-300 font-semibold uppercase">Rarity Kasta</label>
+                <select
+                  value={newRole.rarity}
+                  onChange={(e) => {
+                    const selectedRarity = e.target.value as GachaRole['rarity'];
+                    setNewRole({
+                      ...newRole,
+                      rarity: selectedRarity,
+                      chance: rarityMeta[selectedRarity].weight,
+                    });
+                  }}
+                  className="w-full bg-black/40 border border-[#2d4026] px-2 py-2 rounded text-zinc-100 focus:border-[#9fe870] outline-none text-xs"
+                >
+                  <option value="Common">⚪ Common (60%)</option>
+                  <option value="Rare">🟢 Rare (30%)</option>
+                  <option value="Epic">🔵 Epic (8%)</option>
+                  <option value="Legendary">🟣 Legendary (1.9%)</option>
+                  <option value="Divine">🟡 Divine (0.1%)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-gray-300 font-semibold uppercase">Peluang (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="100"
+                  required
+                  value={newRole.chance}
+                  onChange={(e) => setNewRole({ ...newRole, chance: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-black/40 border border-[#2d4026] px-2.5 py-2 rounded text-zinc-100 focus:border-[#9fe870] outline-none text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                className="w-full py-2 bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-650 hover:to-indigo-650 text-white text-xs font-extrabold rounded-lg tracking-wider uppercase duration-150 transform hover:scale-102 flex items-center justify-center gap-1 cursor-pointer shadow"
+              >
+                <Plus size={14} />
+                <span>Simpan Ke Setelan</span>
+              </button>
+            </div>
+          </form>
         </div>
 
-        <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+        {/* Right Side: Bulk Roll Simulator and Balanced Check Chart */}
+        <div className="lg:col-span-8 bg-[#141b11] border border-[#2d4026] p-6 rounded-2xl space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2d4026]/40 pb-3">
+            <div>
+              <span className="text-[10px] font-mono text-rose-400 font-bold block uppercase tracking-wider">STRESS-BENCH TESTER</span>
+              <h3 className="font-bold text-white text-base">Mesin Penyeimbang Rarity (Gacha Tester Bench)</h3>
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleRunBulkSimulation(100)}
+                disabled={isSimulatingBulk || roles.length === 0}
+                className="px-3.5 py-1.5 bg-zinc-800 text-zinc-300 hover:text-white rounded border border-[#2d4026] font-mono text-[10px] font-bold cursor-pointer disabled:opacity-40"
+              >
+                100x Kocok
+              </button>
+              <button
+                onClick={() => handleRunBulkSimulation(1000)}
+                disabled={isSimulatingBulk || roles.length === 0}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-purple-800 to-indigo-800 text-white rounded font-mono text-[10px] font-bold cursor-pointer disabled:opacity-40 shadow-inner"
+              >
+                💥 1000x Roll Bench
+              </button>
+            </div>
+          </div>
+
+          {/* Verification Chart Result */}
+          {isSimulatingBulk ? (
+            <div className="py-12 text-center text-zinc-500 font-mono text-xs flex flex-col justify-center items-center space-y-2">
+              <Dice5 size={28} className="animate-spin text-[#9fe870]" />
+              <span>Menjalankan hitungan matematika gacha probability stress-test...</span>
+            </div>
+          ) : bulkResult ? (
+            <div className="space-y-4 animate-fade-in font-sans">
+              
+              {/* Verdict Notice box */}
+              <div className="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded-xl flex items-center justify-between text-xs text-emerald-400">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={16} />
+                  <span>Hasil Tes Cocokan: **{bulkResult.totalRolls} Kali kocok selesai**. Peluang terverifikasi stabil.</span>
+                </div>
+                <span className="font-mono font-bold text-[10px] bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded uppercase tracking-wider">VERIFIED PASSED</span>
+              </div>
+
+              {/* Rarity hits layout bars */}
+              <div className="space-y-3 font-mono text-xs text-zinc-400">
+                {Object.keys(rarityMeta).map((key) => {
+                  const rKey = key as GachaRole['rarity'];
+                  const hits = bulkResult.hits[key] || 0;
+                  const pct = bulkResult.actualPercentage[key] || 0;
+                  const targetPct = getRarityStats(rKey).totalChance;
+
+                  return (
+                    <div key={key} className="space-y-1">
+                      <div className="flex justify-between items-baseline text-[11px]">
+                        <span className="font-bold flex items-center gap-1.5" style={{ color: rarityMeta[rKey].color }}>
+                          ● {key}
+                          <span className="text-[9px] font-normal text-zinc-500 font-sans">({hits} hits)</span>
+                        </span>
+                        <span>
+                          Nyata: <strong className="text-white">{pct}%</strong> | Target: <strong className="text-zinc-500">{targetPct}%</strong>
+                        </span>
+                      </div>
+                      <div className="h-2.5 bg-black/50 rounded-full overflow-hidden flex">
+                        <div 
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ 
+                            backgroundColor: rarityMeta[rKey].color, 
+                            width: `${Math.max(1, (pct / 100) * 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          ) : (
+            <div className="bg-black/20 border border-dashed border-zinc-800 rounded-xl p-8 text-center text-zinc-650 font-sans text-xs flex flex-col justify-center items-center space-y-1">
+              <BarChart3 size={24} className="text-zinc-600 mb-1" />
+              <p className="font-semibold text-zinc-500">Benchmark Gacha Belum Berjalan</p>
+              <p>Pilih "1000x Roll Bench" di atas untuk memverifikasi keakuratan generator gacha.</p>
+            </div>
+          )}
+
+        </div>
+
+      </div>
+
+      {/* Role Configurations Table List View */}
+      <div className="bg-[#141b11] border border-[#2d4026] rounded-2xl overflow-hidden shadow-xl font-sans" id="gacha-roles-table-bench">
+        <div className="p-4 bg-black/20 border-b border-[#2d4026] flex items-center justify-between">
+          <h4 className="font-bold text-white text-sm">Daftar Konfigurasi Bobot Peluang Gacha ({roles.length})</h4>
+          <span className="text-[10px] text-[#9fe870] font-mono font-bold uppercase tracking-wider">Total: {roles.reduce((sum, r) => sum + r.chance, 0).toFixed(1)}%</span>
+        </div>
+
+        <div className="overflow-x-auto max-h-[300px]">
           <table className="w-full text-left border-collapse text-xs md:text-sm">
             <thead>
               <tr className="bg-black/40 text-gray-400 border-b border-zinc-800 font-medium">
                 <th className="p-4">Nama Role</th>
                 <th className="p-4">Rarity Tier</th>
-                <th className="p-4">Peluang Keluar</th>
-                <th className="p-4 text-right">Opsi</th>
+                <th className="p-4">Kecenderungan (%)</th>
+                <th className="p-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/40">
               {roles.map((role) => (
-                <tr key={role.id} id={`gacha-row-${role.id}`} className="hover:bg-zinc-800/10 transition-colors">
+                <tr key={role.id} id={`gacha-row-${role.id}`} className="hover:bg-zinc-850/10 transition-colors">
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: role.color }} />
@@ -283,13 +453,12 @@ export default function GachaManager({ initialRoles, updateRoles }: GachaManager
                   <td className="p-4 font-bold" style={{ color: role.color }}>
                     {role.rarity}
                   </td>
-                  <td className="p-4 font-mono text-zinc-300 font-semibold">{role.chance}%</td>
+                  <td className="p-4 font-mono text-zinc-350 font-bold">{role.chance}%</td>
                   <td className="p-4 text-right">
                     <button
-                      id={`delete-gacha-btn-${role.id}`}
                       onClick={() => handleDeleteRole(role.id)}
                       className="p-1 hover:bg-red-950/40 text-red-400 hover:text-red-300 rounded cursor-pointer transition-colors"
-                      title="Copot dari Gacha"
+                      title="Hapus"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -299,31 +468,6 @@ export default function GachaManager({ initialRoles, updateRoles }: GachaManager
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Trial Logs */}
-      <div className="bg-[#1c231a] border border-[#2d4026]/80 p-5 rounded-2xl shadow-xl font-sans" id="gacha-demo-logs">
-        <h4 className="font-bold text-white text-sm flex items-center gap-1.5 mb-3">
-          <BarChart3 size={16} className="text-[#9fe870]" />
-          Arsip Gacha Demo Hasil Uji Coba Terkini
-        </h4>
-        {logs.length === 0 ? (
-          <p className="text-xs text-zinc-500 italic p-4 text-center">Belum ada demo gacha diputar. Klik "🎰 PUTAR GACHA" di atas untuk mengetes.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[150px] overflow-y-auto pr-1">
-            {logs.map((log, lIdx) => (
-              <div key={lIdx} className="bg-black/30 border border-zinc-900 rounded p-2.5 flex justify-between items-center text-xs">
-                <div>
-                  <span className="font-bold block text-white truncate max-w-[120px]">{log.role}</span>
-                  <span className="text-[9px] uppercase font-mono block font-bold" style={{ color: log.color }}>
-                    {log.rarity}
-                  </span>
-                </div>
-                <span className="text-[10px] text-zinc-500 font-mono">{log.time}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KtpRecord } from '../types';
 import KtpCard from './KtpCard';
-import { Search, Plus, Trash2, Download, Eye, MapPin, Sparkles, Check, FileDown, PlusCircle } from 'lucide-react';
+import { Search, Plus, Trash2, Download, Eye, MapPin, Sparkles, Check, FileDown, PlusCircle, ShieldAlert, UserX, Ban, RotateCcw } from 'lucide-react';
 
 interface KtpManagerProps {
   citizens: KtpRecord[];
@@ -9,20 +9,49 @@ interface KtpManagerProps {
   deleteCitizen: (id: string) => void;
 }
 
+interface BlacklistRecord {
+  id: string;
+  username: string;
+  fullname: string;
+  warnings: number;
+  reason: string;
+  dateAdded: string;
+}
+
 export default function KtpManager({ citizens, addCitizen, deleteCitizen }: KtpManagerProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'blacklist'>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCitizen, setSelectedCitizen] = useState<KtpRecord | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  // Form States
+  // Blacklist state
+  const [blacklist, setBlacklist] = useState<BlacklistRecord[]>(() => {
+    const cached = localStorage.getItem('blacklist_db');
+    return cached ? JSON.parse(cached) : [
+      { id: 'bl_1', username: 'kyle_toxic', fullname: 'Kyle Pembuat Onar', warnings: 2, reason: 'Melakukan spamming server referral link judi di chat umum.', dateAdded: '10 - 06 - 2026' },
+      { id: 'bl_2', username: 'bowo_cheater', fullname: 'Bowo Cheater ML', warnings: 3, reason: 'Menggunakan cheat map hack saat sparring antar wilayah Gang Indo.', dateAdded: '11 - 06 - 2026' }
+    ];
+  });
+
+  // Blacklist Form States
+  const [blUsernameInput, setBlUsernameInput] = useState('');
+  const [blFullnameInput, setBlFullnameInput] = useState('');
+  const [blReasonInput, setBlReasonInput] = useState('Mengganggu ketertiban umum');
+  const [blWarningsInput, setBlWarningsInput] = useState(1);
+
+  // Citizens Form States
   const [form, setForm] = useState({
     fullname: '',
     gender: 'Laki-laki' as 'Laki-laki' | 'Perempuan',
-    address: 'Jakarta',
+    address: 'Bandung',
     religion: 'Islam',
-    hobby: 'Mancing ikan',
+    hobby: 'Gaming',
     username: 'warga_gang',
   });
+
+  useEffect(() => {
+    localStorage.setItem('blacklist_db', JSON.stringify(blacklist));
+  }, [blacklist]);
 
   const filtered = citizens.filter(citizen => {
     const q = searchQuery.toLowerCase();
@@ -70,8 +99,48 @@ export default function KtpManager({ citizens, addCitizen, deleteCitizen }: KtpM
     });
   };
 
+  const handleAddBlacklist = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blUsernameInput.trim() || !blFullnameInput.trim()) return;
+
+    const newBl: BlacklistRecord = {
+      id: 'bl_' + Math.random().toString(36).substring(2, 9),
+      username: blUsernameInput.trim().toLowerCase().replace(/\s/g, '_'),
+      fullname: blFullnameInput.trim(),
+      warnings: blWarningsInput,
+      reason: blReasonInput.trim(),
+      dateAdded: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, ' - ')
+    };
+
+    setBlacklist([newBl, ...blacklist]);
+    setBlUsernameInput('');
+    setBlFullnameInput('');
+    setBlReasonInput('Mengganggu ketertiban umum');
+    setBlWarningsInput(1);
+  };
+
+  const handleIncrementWarning = (id: string) => {
+    setBlacklist(prev => prev.map(item => {
+      if (item.id === id) {
+        const nextW = Math.min(3, item.warnings + 1);
+        return { ...item, warnings: nextW };
+      }
+      return item;
+    }));
+  };
+
+  const handlePemberianAmpunan = (id: string) => {
+    // Decrement warning or delete if 0
+    setBlacklist(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target && target.warnings > 1) {
+        return prev.map(item => item.id === id ? { ...item, warnings: item.warnings - 1 } : item);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
   const handleExportSVG = (record: KtpRecord) => {
-    // We will generate a downloadable SVG representation of the card!
     const svgContent = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 312" width="500" height="312">
       <defs>
@@ -120,7 +189,6 @@ export default function KtpManager({ citizens, addCitizen, deleteCitizen }: KtpM
 
       <!-- Avatar Photo -->
       <rect x="360" y="75" width="100" height="120" rx="3" fill="#152311" stroke="#d4af37" stroke-width="2" />
-      <!-- Muted user badge -->
       <circle cx="410" cy="135" r="30" fill="#9fe870" opacity="0.1" />
       <text x="410" y="140" font-family="sans-serif" font-size="15" fill="#9fe870" text-anchor="middle">@</text>
 
@@ -142,129 +210,324 @@ export default function KtpManager({ citizens, addCitizen, deleteCitizen }: KtpM
 
   return (
     <div className="flex-1 p-6 md:p-8 space-y-6 text-gray-100 overflow-y-auto" id="ktp-manager-panel">
-      {/* Top Banner */}
+      
+      {/* Top Banner & Switch Panel tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#2d4026] pb-5">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            📇 Arsip KTP Virtual Server
+            📇 Pencatatan Sipil & Penertiban Server
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Mencetak, memilah, dan mengarsipkan Kartu Tanda Penduduk virtual seluruh warga server.
+            Klaim KTP Virtual resmi warga, unduh vektor, atau kelola sanksi warga nakal di database blacklist server terpadu.
           </p>
         </div>
         
-        <button
-          id="btn-create-ktp-panel"
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center space-x-2 px-5 py-2.5 bg-[#9fe870] text-black font-semibold rounded-lg hover:bg-green-400 active:scale-95 transition-all cursor-pointer shadow-lg shadow-green-950/20 text-xs md:text-sm shrink-0"
-        >
-          <Plus size={16} />
-          <span>Manual Buat KTP</span>
-        </button>
-      </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <button
+            onClick={() => setActiveSubTab('active')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+              activeSubTab === 'active'
+                ? 'bg-[#9fe870] text-black'
+                : 'bg-black/30 border border-[#2d4026] text-gray-300 hover:text-white'
+            }`}
+          >
+            Arsip KTP Aktif ({citizens.length})
+          </button>
 
-      {/* Database Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="ktp-quick-stats">
-        <div className="bg-[#1a2318] border border-[#2d4026]/80 rounded-xl p-4 flex items-center space-x-4">
-          <div className="p-3 bg-green-900/30 text-[#9fe870] rounded-lg">
-            <Check size={22} id="stat-active" />
-          </div>
-          <div>
-            <span className="text-[11px] text-gray-400 font-mono block uppercase">Total Warga Resmi</span>
-            <span className="text-2xl font-bold text-[#9fe870]">{citizens.length}</span>
-          </div>
-        </div>
-        <div className="bg-[#1a2318] border border-[#2d4026]/80 rounded-xl p-4 flex items-center space-x-4">
-          <div className="p-3 bg-blue-900/30 text-blue-400 rounded-lg">
-            <MapPin size={22} id="stat-region" />
-          </div>
-          <div>
-            <span className="text-[11px] text-gray-400 font-mono block uppercase">Domisili Terdaftar</span>
-            <span className="text-2xl font-bold text-white">
-              {Array.from(new Set(citizens.map(c => c.address))).length} Kota
-            </span>
-          </div>
-        </div>
-        <div className="bg-[#1a2318] border border-[#2d4026]/80 rounded-xl p-4 flex items-center space-x-4">
-          <div className="p-3 bg-purple-900/30 text-purple-400 rounded-lg">
-            <Sparkles size={22} id="stat-percentage" />
-          </div>
-          <div>
-            <span className="text-[11px] text-gray-400 font-mono block uppercase">Standarisasi Premium</span>
-            <span className="text-2xl font-bold text-yellow-400">100% Canggih</span>
-          </div>
+          <button
+            onClick={() => setActiveSubTab('blacklist')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center gap-1 ${
+              activeSubTab === 'blacklist'
+                ? 'bg-red-600 text-white shadow-lg'
+                : 'bg-black/30 border border-[#2d4026] text-red-400 hover:text-red-300'
+            }`}
+          >
+            <ShieldAlert size={13} />
+            <span>Blacklist Sanksi ({blacklist.length})</span>
+          </button>
+
+          <button
+            id="btn-create-ktp-panel"
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-green-700 to-emerald-700 hover:bg-green-600 text-white font-bold rounded-lg cursor-pointer text-xs uppercase tracking-wider"
+          >
+            <Plus size={13} />
+            <span>Manual KTP</span>
+          </button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex items-center bg-[#1e2023] border border-[#2d4026] rounded-xl px-4 py-3 group">
-        <Search className="text-gray-400 group-focus-within:text-[#9fe870] mr-3" size={18} />
-        <input
-          type="text"
-          id="search-citizen-input"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari warga berdasarkan Nama Lengkap, Nomor KTP, Domisili, atau Username..."
-          className="bg-transparent flex-1 outline-none text-zinc-100 text-sm font-sans placeholder-gray-500"
-        />
-      </div>
+      {/* SUB TAB A: ACTIVE CITIZENS */}
+      {activeSubTab === 'active' && (
+        <div className="space-y-6" id="ktp-subtab-active">
+          {/* Database Quick Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="ktp-quick-stats">
+            <div className="bg-[#141b11] border border-[#2d4026]/85 rounded-xl p-4 flex items-center space-x-4">
+              <div className="p-3 bg-[#9fe870]/10 text-[#9fe870] rounded-lg border border-[#9fe870]/20">
+                <Check size={22} id="stat-active" />
+              </div>
+              <div>
+                <span className="text-[10px] text-gray-400 font-mono block uppercase">Total Warga Resmi</span>
+                <span className="text-xl font-bold text-white font-mono">{citizens.length} Pembuat</span>
+              </div>
+            </div>
+            <div className="bg-[#141b11] border border-[#2d4026]/85 rounded-xl p-4 flex items-center space-x-4">
+              <div className="p-3 bg-blue-900/10 text-blue-400 rounded-lg border border-blue-900/20">
+                <MapPin size={22} id="stat-region" />
+              </div>
+              <div>
+                <span className="text-[10px] text-gray-400 font-mono block uppercase">Domisili Terdaftar</span>
+                <span className="text-xl font-bold text-white font-mono">
+                  {Array.from(new Set(citizens.map(c => c.address))).length} Hub Wilayah
+                </span>
+              </div>
+            </div>
+            <div className="bg-[#141b11] border border-[#2d4026]/85 rounded-xl p-4 flex items-center space-x-4">
+              <div className="p-3 bg-yellow-900/10 text-yellow-400 rounded-lg border border-yellow-900/20">
+                <Sparkles size={22} id="stat-percentage" />
+              </div>
+              <div>
+                <span className="text-[10px] text-gray-400 font-mono block uppercase">Status Integritas Bot</span>
+                <span className="text-xl font-bold text-[#9fe870] font-mono">Arsip Stabil</span>
+              </div>
+            </div>
+          </div>
 
-      {/* Citizens Grid */}
-      {filtered.length === 0 ? (
-        <div className="bg-black/25 rounded-2xl border border-dashed border-zinc-700/60 p-12 text-center text-zinc-500 font-sans" id="empty-citizens-alert">
-          <Eye size={36} className="mx-auto text-zinc-600 mb-3" />
-          <p className="font-semibold text-zinc-400">Belum Ada Warga Terdaftar</p>
-          <p className="text-xs text-zinc-500 mt-1">Coba buat di playground Discord via button, atau rekrut manual menggunakan panel di kanan atas!</p>
+          {/* Search Bar */}
+          <div className="flex items-center bg-[#1b2019] border border-[#2d4026] rounded-xl px-4 py-3 group">
+            <Search className="text-gray-400 group-focus-within:text-[#9fe870] mr-3" size={18} />
+            <input
+              type="text"
+              id="search-citizen-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari warga berdasarkan Nama Lengkap, Nomor KTP, Domisili, atau Username..."
+              className="bg-transparent flex-1 outline-none text-zinc-100 text-xs md:text-sm font-sans placeholder-gray-600"
+            />
+          </div>
+
+          {/* Citizens Grid */}
+          {filtered.length === 0 ? (
+            <div className="bg-black/25 rounded-2xl border border-dashed border-zinc-700/60 p-12 text-center text-zinc-500 font-sans" id="empty-citizens-alert">
+              <Eye size={36} className="mx-auto text-zinc-650 mb-3" />
+              <p className="font-semibold text-zinc-400">Belum Ada Warga Terdaftar</p>
+              <p className="text-xs text-zinc-500 mt-1">Gunakan tombol 'Simulasi KTP' di Playground atau 'Manual KTP' di pojok kanan atas!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="citizens-archive-grid">
+              {filtered.map((citizen) => (
+                <div
+                  key={citizen.id}
+                  id={`citizen-box-${citizen.id}`}
+                  className="bg-[#141b11] border border-[#2d4026] hover:border-[#9fe870]/40 rounded-2xl p-4 flex flex-col justify-between transition-all group shadow-lg hover:-translate-y-0.5"
+                >
+                  <div className="flex gap-4">
+                    <img
+                      src={citizen.avatarUrl}
+                      alt=""
+                      className="w-16 h-16 rounded-xl bg-black/40 border border-zinc-700 shrink-0 object-cover"
+                    />
+                    <div className="overflow-hidden space-y-1">
+                      <h4 className="font-bold text-white text-base truncate">{citizen.fullname}</h4>
+                      <p className="text-xs text-[#9fe870] font-mono tracking-wider font-semibold">{citizen.id}</p>
+                      <p className="text-xs text-zinc-400 truncate font-medium">🇮🇩 Domisili: {citizen.address} | Hobi: {citizen.hobby}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end border-t border-zinc-800/60 mt-4 pt-3 gap-2">
+                    <button
+                      id={`view-ktp-zoom-${citizen.id}`}
+                      onClick={() => setSelectedCitizen(citizen)}
+                      className="p-2 hover:bg-[#2d4026] text-blue-400 hover:text-white rounded-lg transition-all cursor-pointer"
+                      title="Lihat KTP"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <button
+                      id={`export-ktp-btn-${citizen.id}`}
+                      onClick={() => handleExportSVG(citizen)}
+                      className="p-2 hover:bg-[#2d4026] text-green-400 hover:text-white rounded-lg transition-all cursor-pointer"
+                      title="Unduh Vector SVG"
+                    >
+                      <Download size={15} />
+                    </button>
+                    <button
+                      id={`delete-citizen-btn-${citizen.id}`}
+                      onClick={() => deleteCitizen(citizen.id)}
+                      className="p-2 hover:bg-red-950/40 text-red-500 hover:text-red-300 rounded-lg transition-all cursor-pointer"
+                      title="Hapus Warga"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="citizens-archive-grid">
-          {filtered.map((citizen) => (
-            <div
-              key={citizen.id}
-              id={`citizen-box-${citizen.id}`}
-              className="bg-[#1b2518]/60 border border-[#2d4026]/40 hover:border-[#9fe870]/40 rounded-2xl p-4 flex flex-col justify-between transition-all group shadow-lg hover:-translate-y-0.5"
-            >
-              <div className="flex gap-4">
-                <img
-                  src={citizen.avatarUrl}
-                  alt=""
-                  className="w-16 h-16 rounded-xl bg-black/40 border border-zinc-700 shrink-0 object-cover"
+      )}
+
+      {/* SUB TAB B: BLACKLISTED USERS */}
+      {activeSubTab === 'blacklist' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start" id="ktp-subtab-blacklist">
+          
+          {/* Blacklist Entry Form (4 Columns) */}
+          <div className="lg:col-span-4 bg-[#141b11] border border-[#2d4026] p-6 rounded-2xl space-y-4 shadow-xl">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono text-red-400 font-bold block uppercase tracking-wider">TIDAK TERTIB</span>
+              <h3 className="font-bold text-white text-base">Registrasi Kasus Warga</h3>
+              <p className="text-xs text-gray-400">Laporkan pelanggaran aturan chat general server.</p>
+            </div>
+
+            <form onSubmit={handleAddBlacklist} className="space-y-4 text-xs font-sans">
+              <div className="space-y-1">
+                <label className="text-xs text-gray-300 font-semibold uppercase">Nama Lengkap</label>
+                <input
+                  type="text"
+                  required
+                  value={blFullnameInput}
+                  onChange={(e) => setBlFullnameInput(e.target.value)}
+                  placeholder="Contoh: Deni Begal Rusuh"
+                  className="w-full bg-black/40 border border-[#2d4026] px-3.5 py-2.5 rounded text-zinc-100 placeholder-zinc-700 outline-none text-xs"
                 />
-                <div className="overflow-hidden space-y-1">
-                  <h4 className="font-bold text-white text-base truncate">{citizen.fullname}</h4>
-                  <p className="text-xs text-[#9fe870] font-mono tracking-wider font-semibold">{citizen.id}</p>
-                  <p className="text-xs text-zinc-400 truncate font-medium">🇮🇩 Domisili: {citizen.address} | Hobi: {citizen.hobby}</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-gray-300 font-semibold uppercase">Discord Username</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-zinc-650 font-bold">@</span>
+                  <input
+                    type="text"
+                    required
+                    value={blUsernameInput}
+                    onChange={(e) => setBlUsernameInput(e.target.value)}
+                    placeholder="deni_rusak"
+                    className="w-full bg-black/40 border border-[#2d4026] pl-7 pr-3.5 py-2.5 rounded text-zinc-100 placeholder-zinc-700 outline-none text-xs"
+                  />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end border-t border-zinc-800/60 mt-4 pt-3 gap-2">
-                <button
-                  id={`view-ktp-zoom-${citizen.id}`}
-                  onClick={() => setSelectedCitizen(citizen)}
-                  className="p-2 hover:bg-[#2d4026] text-blue-400 hover:text-white rounded-lg transition-all cursor-pointer"
-                  title="Lihat KTP"
+              <div className="space-y-1">
+                <label className="text-xs text-gray-350 font-bold uppercase tracking-wider">Pelanggaran Yang Dilakukan</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={blReasonInput}
+                  onChange={(e) => setBlReasonInput(e.target.value)}
+                  placeholder="Sebeutkan alasan pembatasan..."
+                  className="w-full bg-black/40 border border-[#2d4026] px-3.5 py-2.5 rounded text-zinc-100 placeholder-zinc-700 outline-none text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-gray-300 font-semibold uppercase">Jumlah Warning Default</label>
+                <select
+                  value={blWarningsInput}
+                  onChange={(e) => setBlWarningsInput(parseInt(e.target.value))}
+                  className="w-full bg-black/40 border border-[#2d4026] p-2 rounded text-zinc-100 text-xs outline-none"
                 >
-                  <Eye size={16} />
-                </button>
+                  <option value={1}>1x Peringatan (Teguran Ringan)</option>
+                  <option value={2}>2x Peringatan (Batas Akhir)</option>
+                  <option value={3}>3x Peringatan (DEPORTASI / BANNED)</option>
+                </select>
+              </div>
+
+              <div className="pt-2">
                 <button
-                  id={`export-ktp-btn-${citizen.id}`}
-                  onClick={() => handleExportSVG(citizen)}
-                  className="p-2 hover:bg-[#2d4026] text-green-400 hover:text-white rounded-lg transition-all cursor-pointer"
-                  title="Unduh Vector SVG"
+                  type="submit"
+                  className="w-full py-2.5 bg-gradient-to-r from-red-700 to-amber-700 hover:from-red-650 hover:to-amber-650 text-white font-extrabold rounded-lg text-xs uppercase tracking-wider duration-150 transform hover:scale-102 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
                 >
-                  <Download size={16} />
-                </button>
-                <button
-                  id={`delete-citizen-btn-${citizen.id}`}
-                  onClick={() => deleteCitizen(citizen.id)}
-                  className="p-2 hover:bg-red-950/40 text-red-400 hover:text-red-300 rounded-lg transition-all cursor-pointer"
-                  title="Hapus Warga"
-                >
-                  <Trash2 size={16} />
+                  <UserX size={14} />
+                  <span>Keluarkan Surat Cekal</span>
                 </button>
               </div>
+            </form>
+          </div>
+
+          {/* Blacklist List Ledger (8 Columns) */}
+          <div className="lg:col-span-8 space-y-4">
+            <h4 className="text-xs font-mono font-bold text-gray-400 uppercase tracking-widest">Daftar Cekal & Blacklisted Warga</h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {blacklist.length === 0 ? (
+                <p className="md:col-span-2 text-zinc-650 text-center py-12 italic text-xs bg-black/20 rounded-xl border border-dashed border-zinc-850">
+                  Kampung aman terkendali! Tidak ada warga yang masuk daftar cekal blacklist hari ini.
+                </p>
+              ) : (
+                blacklist.map((item) => {
+                  const isBanned = item.warnings >= 3;
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`relative overflow-hidden p-5 rounded-2xl border transition-all ${
+                        isBanned 
+                          ? 'bg-red-950/15 border-red-800/40 text-red-200' 
+                          : 'bg-[#141b11] border-zinc-800 text-gray-300'
+                      }`}
+                    >
+                      {/* Banned rubber stamp */}
+                      {isBanned && (
+                        <div className="absolute top-2 right-2 transform rotate-12 bg-red-600 text-white font-black px-3 py-1 text-[10px] uppercase tracking-widest rounded border-2 border-red-400 select-none shadow animate-pulse">
+                          🚨 BANNED
+                        </div>
+                      )}
+
+                      <div className="space-y-3 font-sans">
+                        <div>
+                          <h4 className="font-bold text-white text-base">{item.fullname}</h4>
+                          <span className="text-xs text-red-400 font-mono font-bold">@{item.username}</span>
+                        </div>
+
+                        <p className="text-xs italic text-zinc-400 line-clamp-2">
+                          "{item.reason}"
+                        </p>
+
+                        {/* Warnings Gauge */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-mono leading-none">
+                            <span className="text-zinc-500 uppercase font-semibold">Tingkat Pelanggaran</span>
+                            <span className="font-bold text-red-400">{item.warnings} / 3 Warning</span>
+                          </div>
+                          
+                          {/* Meter bar */}
+                          <div className="h-2 bg-black/60 rounded-full overflow-hidden flex gap-0.5 p-0.5">
+                            <div className="h-full rounded-full transition-all duration-300 flex-1 bg-yellow-500" />
+                            <div className={`h-full rounded-full transition-all duration-300 flex-1 ${item.warnings >= 2 ? 'bg-amber-500' : 'bg-transparent'}`} />
+                            <div className={`h-full rounded-full transition-all duration-300 flex-1 ${item.warnings >= 3 ? 'bg-red-500' : 'bg-transparent'}`} />
+                          </div>
+                        </div>
+
+                        {/* Date info & fast actions */}
+                        <div className="flex justify-between items-center pt-2.5 border-t border-zinc-800/50 text-[10px] text-zinc-500">
+                          <span>Dilaporkan: {item.dateAdded}</span>
+                          <div className="flex gap-1">
+                            {!isBanned && (
+                              <button
+                                onClick={() => handleIncrementWarning(item.id)}
+                                className="px-2 py-1 bg-red-900/20 hover:bg-red-900/40 text-red-400 font-bold rounded cursor-pointer border border-red-800/20"
+                                title="Tambah Peringatan"
+                              >
+                                +1 Warning
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handlePemberianAmpunan(item.id)}
+                              className="px-2 py-1 bg-green-950/40 hover:bg-green-900/40 text-green-400 font-bold rounded cursor-pointer border border-green-800/10 flex items-center gap-0.5"
+                              title="Kurangi atau Ampuni"
+                            >
+                              <RotateCcw size={10} />
+                              <span>{item.warnings > 1 ? 'Kurangi' : 'Ampuni'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
-          ))}
+          </div>
+
         </div>
       )}
 

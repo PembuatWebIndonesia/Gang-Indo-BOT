@@ -6,6 +6,9 @@ import GachaManager from './components/GachaManager';
 import DecorationsManager from './components/DecorationsManager';
 import TicketManager from './components/TicketManager';
 import MusicManager from './components/MusicManager';
+import EconomyManager from './components/EconomyManager';
+import EmbedBuilder from './components/EmbedBuilder';
+import GiveawayManager from './components/GiveawayManager';
 import { COMMANDS_DATA } from './data/commands';
 import { KtpRecord, GachaRole, BotConfig, LogEntry, NicknameDecoration, TicketCategory, TicketRecord, MusicTrack } from './types';
 import { Bot, Terminal, LayoutDashboard, Settings, Sparkles, BookOpen, Clock, Activity, MessageSquare, Plus, Save, Copy, Check, ShieldAlert, Sparkle, ExternalLink } from 'lucide-react';
@@ -590,6 +593,21 @@ export default function App() {
             playlist={botConfig.playlist || DEFAULT_PLAYLIST}
             updateMusicConfig={updateMusicConfig}
           />
+        )}
+
+        {/* TAB ECONOMY: LEVELING & ECONOMY LEDGERS */}
+        {currentTab === 'economy' && (
+          <EconomyManager citizens={citizens} addLog={addLog} />
+        )}
+
+        {/* TAB EMBED: VISUAL EMBED MAKER */}
+        {currentTab === 'embed' && (
+          <EmbedBuilder addLog={addLog} />
+        )}
+
+        {/* TAB GIVEAWAY: LOTTERY & SCHEDULER EVENTS */}
+        {currentTab === 'giveaway' && (
+          <GiveawayManager citizens={citizens} addLog={addLog} />
         )}
 
         {/* TAB 5: VIRTUAL DISCORD CONSOLE PLAYGROUND */}

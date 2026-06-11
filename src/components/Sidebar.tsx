@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Bot, FolderHeart, Sparkles, Terminal, BookOpen, Settings, Info, Tag, Ticket, Music } from 'lucide-react';
+import { LayoutDashboard, Bot, FolderHeart, Sparkles, Terminal, BookOpen, Settings, Info, Tag, Ticket, Music, Coins, FileCode, Gift } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
@@ -14,6 +14,9 @@ export default function Sidebar({ currentTab, setCurrentTab, botStatus }: Sideba
     { id: 'ktp', name: 'Arsip KTP Virtual', icon: FolderHeart },
     { id: 'gacha', name: 'Gacha Nasib', icon: Sparkles },
     { id: 'decorations', name: 'Hiasan Nickname', icon: Tag },
+    { id: 'economy', name: 'Sistem Ekonomi XP', icon: Coins },
+    { id: 'embed', name: 'Pembuat Embed', icon: FileCode },
+    { id: 'giveaway', name: 'Undian & Giveaway', icon: Gift },
     { id: 'tickets', name: 'Tiket Bantuan', icon: Ticket },
     { id: 'music', name: 'Musik DJ Otomatis', icon: Music },
     { id: 'playground', name: 'Konsol Playground', icon: Terminal },

@@ -1,5 +1,5 @@
 {
-  "name": "Gang Indo Bot & Dashboard",
+  "name": "Gang Indo Bot and Dashboard",
   "description": "Premium Indonesian Discord Bot with 70+ commands, Gacha Role (Gacha Nasib), and Virtual KTP Creator.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
